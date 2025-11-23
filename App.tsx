@@ -21,7 +21,9 @@ import {
   Users,
   PlusCircle,
   HelpCircle,
-  Mail
+  Mail,
+  Copy,
+  Check
 } from 'lucide-react';
 import { VerificationType, NavItem, AuditLogEntry } from './types';
 import { NIGERIAN_BANKS } from './constants';
@@ -37,6 +39,7 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
     const [mode, setMode] = useState<'login' | 'buy'>('login');
     const [pin, setPin] = useState('');
     const [loginError, setLoginError] = useState('');
+    const [loggingIn, setLoggingIn] = useState(false);
 
     // Buy Mode States
     const [amountInput, setAmountInput] = useState<string>('1');
@@ -45,23 +48,32 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
     const [notificationStatus, setNotificationStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
     const [generatedPin, setGeneratedPin] = useState<string | null>(null);
     const [transactionRef, setTransactionRef] = useState<string>('');
+    const [copiedPin, setCopiedPin] = useState(false);
 
     // Derived credits from input
     const credits = parseInt(amountInput) || 0;
     const totalCost = credits * 50;
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         if (pin.length !== 4) {
             setLoginError('Please enter a valid 4-digit PIN.');
             return;
         }
 
+        setLoggingIn(true);
+        setLoginError('');
+        
+        // Simulate robust validation delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         const account = validatePin(pin);
         
         if (account) {
             onLogin(pin);
+            // No need to setLoggingIn(false) as component will unmount/switch view
         } else {
             setLoginError('Access Denied: PIN not found or invalid.');
+            setLoggingIn(false);
         }
     };
 
@@ -116,6 +128,14 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
         );
     };
 
+    const handleCopyPin = () => {
+        if (generatedPin) {
+            navigator.clipboard.writeText(generatedPin);
+            setCopiedPin(true);
+            setTimeout(() => setCopiedPin(false), 2000);
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
             <Card className="w-full max-w-md p-8 !bg-white shadow-2xl border-slate-200">
@@ -162,7 +182,13 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                 }}
                             />
                             {loginError && <div className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium">{loginError}</div>}
-                            <Button className="w-full text-lg py-4" onClick={handleLogin}>Unlock Dashboard</Button>
+                            <Button 
+                                className="w-full text-lg py-4" 
+                                onClick={handleLogin}
+                                isLoading={loggingIn}
+                            >
+                                {loggingIn ? 'Validating...' : 'Unlock Dashboard'}
+                            </Button>
                             
                             <p className="text-xs text-center text-slate-400">
                                 Don't have a code? Switch to "Buy Credits" above.
@@ -231,21 +257,30 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                     </div>
                                     
                                     <div>
-                                        <h3 className="font-bold text-xl text-slate-900">Purchase Successful!</h3>
-                                        <p className="text-slate-500 text-sm mt-1">Your credit access code is ready.</p>
+                                        <h3 className="font-bold text-xl text-slate-900">Order Confirmed!</h3>
+                                        <p className="text-slate-500 text-sm mt-1">Your secure access code has been generated.</p>
                                     </div>
 
-                                    <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                                    <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 p-4 opacity-10"><Lock size={80}/></div>
-                                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-semibold">Your Access PIN</p>
+                                        <div className="flex justify-between items-center mb-2">
+                                             <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Your Access PIN</p>
+                                             <button 
+                                                onClick={handleCopyPin}
+                                                className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg backdrop-blur-sm"
+                                             >
+                                                {copiedPin ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} />}
+                                                {copiedPin ? 'Copied' : 'Copy PIN'}
+                                             </button>
+                                        </div>
                                         <div className="text-5xl font-mono font-bold tracking-widest">{generatedPin}</div>
                                     </div>
 
                                     <div className="text-xs text-slate-600 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left leading-relaxed flex gap-3 items-start">
                                         <Mail className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                                         <div>
-                                            <p className="mb-2"><strong>Sent!</strong> We've emailed this code to <b>{contact}</b>.</p>
-                                            <p>It contains <strong>{credits} credits</strong>.</p>
+                                            <p className="mb-2"><strong>Notification Sent!</strong> We've also emailed this code to <b>{contact}</b> for your records.</p>
+                                            <p>It contains <strong>{credits} credits</strong> valid for immediate use.</p>
                                         </div>
                                     </div>
 
@@ -266,8 +301,9 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                     <div className="flex gap-3 pt-2">
                                         <Button variant="secondary" className="flex-1" onClick={() => {
                                             setGeneratedPin(null);
-                                            setAmountInput('1');
+                                            setAmountInput('');
                                             setContact('');
+                                            setMode('buy');
                                         }}>Buy More</Button>
                                         <Button className="flex-1" onClick={() => {
                                             setMode('login');
