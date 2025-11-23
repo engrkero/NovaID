@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -18,13 +19,16 @@ import {
   LogOut,
   MessageSquare,
   Users,
-  PlusCircle
+  PlusCircle,
+  HelpCircle,
+  Mail
 } from 'lucide-react';
 import { VerificationType, NavItem, AuditLogEntry } from './types';
 import { NIGERIAN_BANKS } from './constants';
 import { verifyIdentity } from './services/geminiService';
 import { saveAuditLog, getAuditLogs, clearAuditLogs } from './services/auditService';
 import { purchaseCredits, validatePin, deductCredit, getBalance, hasSufficientBalance } from './services/creditService';
+import { sendSimulatedNotification } from './services/notificationService';
 import { Card, Button, Input, Select, ResultDisplay, Alert, Modal, Pagination, CopyButton } from './components/UI';
 
 // --- Auth / Credit Portal Components ---
@@ -35,10 +39,16 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
     const [loginError, setLoginError] = useState('');
 
     // Buy Mode States
-    const [credits, setCredits] = useState(1);
+    const [amountInput, setAmountInput] = useState<string>('1');
     const [contact, setContact] = useState('');
     const [buying, setBuying] = useState(false);
+    const [notificationStatus, setNotificationStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
     const [generatedPin, setGeneratedPin] = useState<string | null>(null);
+    const [transactionRef, setTransactionRef] = useState<string>('');
+
+    // Derived credits from input
+    const credits = parseInt(amountInput) || 0;
+    const totalCost = credits * 50;
 
     const handleLogin = () => {
         if (pin.length !== 4) {
@@ -66,20 +76,41 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
         }
 
         setBuying(true);
+        setNotificationStatus('idle');
+
         purchaseCredits(
             credits, 
             contact, 
-            (newPin, ref) => {
-                setBuying(false);
-                setGeneratedPin(newPin);
+            async (newPin, ref) => {
+                setTransactionRef(ref);
+                
+                // 1. Payment Success - Log it
                 saveAuditLog({
                     type: VerificationType.CREDIT_PURCHASE,
                     input: `Bought ${credits} credits`,
                     status: 'success',
-                    message: 'Credits purchased successfully',
+                    message: 'Payment successful',
                     transactionRef: ref,
                     details: { credits, contact, pin: newPin }
                 });
+
+                // 2. Trigger Notification
+                setNotificationStatus('sending');
+                await sendSimulatedNotification(contact, newPin, credits, ref);
+                setNotificationStatus('sent');
+                
+                // 3. Log Notification
+                saveAuditLog({
+                    type: VerificationType.CREDIT_PURCHASE,
+                    input: `Email Notification`,
+                    status: 'success',
+                    message: `PIN sent to ${contact}`,
+                    transactionRef: ref,
+                    details: { method: 'Simulated Email', recipient: contact }
+                });
+
+                setGeneratedPin(newPin);
+                setBuying(false);
             },
             () => setBuying(false)
         );
@@ -153,7 +184,7 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                             {[1, 5, 10, 20].map(num => (
                                                 <button
                                                     key={num}
-                                                    onClick={() => setCredits(num)}
+                                                    onClick={() => setAmountInput(num.toString())}
                                                     className={`py-2 rounded-xl border-2 font-bold text-sm transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
                                                 >
                                                     {num}
@@ -161,20 +192,21 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                             ))}
                                         </div>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold uppercase">Custom Amount:</span>
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold uppercase">Custom:</span>
                                             <input 
                                                 type="number"
                                                 min="1"
-                                                className="w-full pl-32 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
-                                                value={credits}
-                                                onChange={(e) => setCredits(Math.max(1, parseInt(e.target.value) || 0))}
+                                                placeholder="Enter amount"
+                                                className="w-full pl-20 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
+                                                value={amountInput}
+                                                onChange={(e) => setAmountInput(e.target.value)}
                                             />
                                         </div>
                                     </div>
 
                                     <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200">
                                         <span className="text-sm font-medium text-slate-600">Total Cost:</span>
-                                        <span className="text-xl font-bold text-slate-900">₦{(credits * 50).toLocaleString()}</span>
+                                        <span className="text-xl font-bold text-slate-900">₦{totalCost.toLocaleString()}</span>
                                     </div>
                                     <Input 
                                         label="Email or WhatsApp" 
@@ -183,7 +215,14 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                         onChange={(e) => setContact(e.target.value)}
                                         className="py-3 font-medium !text-slate-900 !bg-white placeholder:!text-slate-400"
                                     />
-                                    <Button className="w-full text-lg py-4" onClick={handlePurchase} isLoading={buying}>Proceed to Payment</Button>
+                                    <Button 
+                                        className="w-full text-lg py-4" 
+                                        onClick={handlePurchase} 
+                                        isLoading={buying || notificationStatus === 'sending'}
+                                        disabled={credits < 1}
+                                    >
+                                        {notificationStatus === 'sending' ? 'Sending Email...' : 'Proceed to Payment'}
+                                    </Button>
                                 </>
                             ) : (
                                 <div className="text-center space-y-6">
@@ -202,13 +241,34 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                         <div className="text-5xl font-mono font-bold tracking-widest">{generatedPin}</div>
                                     </div>
 
-                                    <div className="text-xs text-slate-600 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left leading-relaxed">
-                                        <p className="mb-2"><strong>Save this code!</strong> It has been sent to <b>{contact}</b> (simulated).</p>
-                                        <p>This code holds your <strong>{credits} credits</strong>. Use it to log in anytime.</p>
+                                    <div className="text-xs text-slate-600 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left leading-relaxed flex gap-3 items-start">
+                                        <Mail className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="mb-2"><strong>Sent!</strong> We've emailed this code to <b>{contact}</b>.</p>
+                                            <p>It contains <strong>{credits} credits</strong>.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Support Fallback */}
+                                    <div className="pt-2 border-t border-slate-100">
+                                        <p className="text-xs text-slate-400 mb-2">Code didn't arrive?</p>
+                                        <a 
+                                            href={`https://wa.me/2349015183471?text=Hello Admin, I purchased ${credits} credits but didn't receive my code. Transaction Ref: ${transactionRef}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors bg-slate-50 hover:bg-emerald-50 px-3 py-2 rounded-lg border border-slate-200"
+                                        >
+                                            <HelpCircle className="w-3 h-3" />
+                                            Contact Admin (WhatsApp)
+                                        </a>
                                     </div>
                                     
-                                    <div className="flex gap-3">
-                                        <Button variant="secondary" className="flex-1" onClick={() => setGeneratedPin(null)}>Buy More</Button>
+                                    <div className="flex gap-3 pt-2">
+                                        <Button variant="secondary" className="flex-1" onClick={() => {
+                                            setGeneratedPin(null);
+                                            setAmountInput('1');
+                                            setContact('');
+                                        }}>Buy More</Button>
                                         <Button className="flex-1" onClick={() => {
                                             setMode('login');
                                             setPin(generatedPin);
