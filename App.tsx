@@ -75,23 +75,23 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
-            <Card className="w-full max-w-md p-8 !bg-white/90">
+            <Card className="w-full max-w-md p-8 !bg-white shadow-2xl border-slate-200">
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white mx-auto flex items-center justify-center text-2xl font-bold font-display mb-4 shadow-xl">N</div>
                     <h1 className="text-3xl font-display font-bold text-slate-900">NovaID Access</h1>
-                    <p className="text-slate-500 mt-2">Secure Identity Verification Portal</p>
+                    <p className="text-slate-500 mt-2 font-medium">Secure Identity Verification Portal</p>
                 </div>
 
-                <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
+                <div className="flex p-1 bg-slate-100 rounded-xl mb-6 border border-slate-200">
                     <button 
                         onClick={() => setMode('login')}
-                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Enter PIN
                     </button>
                     <button 
                         onClick={() => setMode('buy')}
-                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'buy' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'buy' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Buy Credits
                     </button>
@@ -104,22 +104,26 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 20 }}
-                            className="space-y-4"
+                            className="space-y-6"
                         >
                             <Input 
                                 label="Access PIN" 
-                                placeholder="Enter 4-digit code" 
+                                placeholder="0 0 0 0" 
                                 maxLength={4}
-                                type="password"
-                                className="text-center tracking-[1em] font-mono text-lg"
+                                type="text"
+                                className="text-center tracking-[1em] font-mono text-2xl py-4 font-bold text-slate-900 placeholder:text-slate-200"
                                 value={pin}
                                 onChange={(e) => {
                                     setPin(e.target.value.replace(/\D/g,''));
                                     setLoginError('');
                                 }}
                             />
-                            {loginError && <div className="text-rose-500 text-sm text-center bg-rose-50 p-2 rounded-lg">{loginError}</div>}
-                            <Button className="w-full" onClick={handleLogin}>Unlock Dashboard</Button>
+                            {loginError && <div className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium">{loginError}</div>}
+                            <Button className="w-full text-lg py-4" onClick={handleLogin}>Unlock Dashboard</Button>
+                            
+                            <p className="text-xs text-center text-slate-400">
+                                Don't have a code? Switch to "Buy Credits" above.
+                            </p>
                         </motion.div>
                     ) : (
                         <motion.div 
@@ -127,60 +131,67 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="space-y-4"
+                            className="space-y-6"
                         >
                             {!generatedPin ? (
                                 <>
                                     <div>
-                                        <label className="text-sm font-medium text-slate-600 mb-2 block">Select Credits (₦50 / unit)</label>
+                                        <label className="text-sm font-bold text-slate-700 mb-2 block">Select Credits (₦50 / unit)</label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {[1, 5, 10, 20].map(num => (
                                                 <button
                                                     key={num}
                                                     onClick={() => setCredits(num)}
-                                                    className={`py-2 rounded-xl border transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 hover:border-slate-400'}`}
+                                                    className={`py-3 rounded-xl border-2 font-bold transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
                                                 >
                                                     {num}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="bg-slate-50 p-3 rounded-xl flex justify-between items-center border border-slate-200">
-                                        <span className="text-sm text-slate-500">Total Cost:</span>
-                                        <span className="text-lg font-bold text-slate-900">₦{credits * 50}</span>
+                                    <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200">
+                                        <span className="text-sm font-medium text-slate-600">Total Cost:</span>
+                                        <span className="text-xl font-bold text-slate-900">₦{credits * 50}</span>
                                     </div>
                                     <Input 
                                         label="Email or WhatsApp" 
-                                        placeholder="For PIN delivery" 
+                                        placeholder="e.g. user@email.com" 
                                         value={contact}
                                         onChange={(e) => setContact(e.target.value)}
+                                        className="py-3 font-medium text-slate-900"
                                     />
-                                    <Button className="w-full" onClick={handlePurchase} isLoading={buying}>Proceed to Payment</Button>
+                                    <Button className="w-full text-lg py-4" onClick={handlePurchase} isLoading={buying}>Proceed to Payment</Button>
                                 </>
                             ) : (
-                                <div className="text-center space-y-4">
-                                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <div className="text-center space-y-6">
+                                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
                                         <Wallet className="w-8 h-8" />
                                     </div>
-                                    <h3 className="font-bold text-lg text-slate-900">Purchase Successful!</h3>
-                                    <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl">
-                                        <p className="text-xs text-slate-500 uppercase mb-1">Your Access PIN</p>
-                                        <div className="text-4xl font-mono font-bold text-slate-900 tracking-widest">{generatedPin}</div>
+                                    
+                                    <div>
+                                        <h3 className="font-bold text-xl text-slate-900">Purchase Successful!</h3>
+                                        <p className="text-slate-500 text-sm mt-1">Your credit access code is ready.</p>
                                     </div>
-                                    <div className="text-xs text-slate-500 bg-blue-50 p-3 rounded-lg border border-blue-100 text-left">
-                                        <p className="mb-2"><strong>Note:</strong> This PIN has been bound to your {credits} credits.</p>
-                                        <p>If you didn't receive the code via Email/WhatsApp within 5 mins, contact Admin Support.</p>
-                                        <div className="mt-2 font-medium flex items-center gap-2 text-blue-700">
-                                            <MessageSquare className="w-3 h-3" />
-                                            Admin: +234 800 NOVA SUP
-                                        </div>
+
+                                    <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10"><Lock size={80}/></div>
+                                        <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-semibold">Your Access PIN</p>
+                                        <div className="text-5xl font-mono font-bold tracking-widest">{generatedPin}</div>
                                     </div>
-                                    <Button variant="secondary" className="w-full" onClick={() => setGeneratedPin(null)}>Buy More</Button>
-                                    <Button className="w-full" onClick={() => {
-                                        setMode('login');
-                                        setPin(generatedPin);
-                                        setGeneratedPin(null);
-                                    }}>Login with PIN</Button>
+
+                                    <div className="text-xs text-slate-600 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left leading-relaxed">
+                                        <p className="mb-2"><strong>Save this code!</strong> It has been sent to <b>{contact}</b> (simulated).</p>
+                                        <p>This code holds your <strong>{credits} credits</strong>. Use it to log in anytime.</p>
+                                    </div>
+                                    
+                                    <div className="flex gap-3">
+                                        <Button variant="secondary" className="flex-1" onClick={() => setGeneratedPin(null)}>Buy More</Button>
+                                        <Button className="flex-1" onClick={() => {
+                                            setMode('login');
+                                            setPin(generatedPin);
+                                            setGeneratedPin(null);
+                                        }}>Login Now</Button>
+                                    </div>
                                 </div>
                             )}
                         </motion.div>
@@ -258,8 +269,8 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
             )}
           </AnimatePresence>
 
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 w-full">
               <Input 
                 label="BVN (11 Digits)" 
                 placeholder="22223333444" 
@@ -273,7 +284,7 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
                 }}
               />
             </div>
-            <Button onClick={handleVerify} isLoading={loading}>Verify Identity</Button>
+            <Button className="w-full md:w-auto" onClick={handleVerify} isLoading={loading}>Verify Identity</Button>
           </div>
           <AnimatePresence>
             {result && <ResultDisplay title="KYC Identity Profile" data={result} />}
@@ -343,8 +354,8 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
             )}
           </AnimatePresence>
 
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 w-full">
               <Input 
                 label="NIN (11 Digits)" 
                 placeholder="11112222333" 
@@ -356,7 +367,7 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
                 }}
               />
             </div>
-            <Button onClick={handleVerify} isLoading={loading}>Verify NIN</Button>
+            <Button className="w-full md:w-auto" onClick={handleVerify} isLoading={loading}>Verify NIN</Button>
           </div>
            <AnimatePresence>
             {result && <ResultDisplay title="NIMC Record" data={result} />}
@@ -374,8 +385,10 @@ const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBala
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = async () => {
-    if (!phone) {
-        setError("Please enter a valid phone number.");
+    // Basic Nigerian Phone Regex
+    const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
+    if (!phoneRegex.test(phone)) {
+        setError("Invalid Nigerian phone number format.");
         return;
     }
     if (!deductCredit(activePin)) {
@@ -419,8 +432,8 @@ const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBala
           <AnimatePresence>
             {error && <div className="mb-6"><Alert type="error" title="Error" message={error} /></div>}
           </AnimatePresence>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 w-full">
               <Input 
                 label="Phone Number" 
                 placeholder="08012345678" 
@@ -428,7 +441,7 @@ const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBala
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
-            <Button onClick={handleVerify} isLoading={loading}>Resolve</Button>
+            <Button className="w-full md:w-auto" onClick={handleVerify} isLoading={loading}>Resolve</Button>
           </div>
            <AnimatePresence>
             {result && <ResultDisplay title="Subscriber Details" data={result} />}
@@ -447,7 +460,7 @@ const AccountVerification: React.FC<VerificationProps> = ({ activePin, refreshBa
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = async () => {
-    if (!account || account.length < 10) {
+    if (!account || account.length !== 10) {
         setError("Please enter a valid 10-digit account number.");
         return;
     }
@@ -689,7 +702,7 @@ const AuditLogs = () => {
                             <input 
                                 type="text"
                                 placeholder="Search logs..." 
-                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -717,30 +730,30 @@ const AuditLogs = () => {
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                                            <th className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tl-lg">Time</th>
-                                            <th className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                                            <th className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Details</th>
-                                            <th className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                            <th className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-lg">Action</th>
+                                        <tr className="border-b border-slate-200 bg-slate-50">
+                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-lg">Time</th>
+                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Type</th>
+                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Details</th>
+                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tr-lg">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                                    <tbody className="divide-y divide-slate-100">
                                         {paginatedLogs.map((log) => (
                                             <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
                                                 <td className="p-3 text-sm text-slate-500 whitespace-nowrap">
                                                     {new Date(log.timestamp).toLocaleTimeString()} 
                                                     <span className="text-xs ml-1 opacity-60 block">{new Date(log.timestamp).toLocaleDateString()}</span>
                                                 </td>
-                                                <td className="p-3 text-sm font-medium text-slate-800">
+                                                <td className="p-3 text-sm font-bold text-slate-800">
                                                     {log.type === VerificationType.CREDIT_PURCHASE ? 
                                                         <span className="text-emerald-600 flex items-center gap-1"><Wallet className="w-3 h-3"/> Purchase</span> : 
                                                         log.type.replace(/_/g, ' ')
                                                     }
                                                 </td>
-                                                <td className="p-3 text-sm text-slate-600 font-mono">{log.input}</td>
+                                                <td className="p-3 text-sm text-slate-600 font-mono bg-slate-50/50 rounded">{log.input}</td>
                                                 <td className="p-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
                                                         log.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                                                     }`}>
                                                         {log.status}
@@ -749,7 +762,7 @@ const AuditLogs = () => {
                                                 <td className="p-3">
                                                     <button 
                                                         onClick={() => setSelectedLog(log)}
-                                                        className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-1 rounded"
                                                     >
                                                         Details <ExternalLink className="w-3 h-3"/>
                                                     </button>
@@ -777,32 +790,32 @@ const AuditLogs = () => {
                 {selectedLog && (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="p-3 bg-slate-50 rounded-lg">
-                                <div className="text-xs text-slate-500 uppercase mb-1">Transaction ID</div>
+                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Transaction ID</div>
                                 <div className="font-mono text-slate-800 break-all">{selectedLog.id}</div>
                             </div>
-                            <div className="p-3 bg-slate-50 rounded-lg">
-                                <div className="text-xs text-slate-500 uppercase mb-1">Reference</div>
+                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Reference</div>
                                 <div className="font-mono text-slate-800 break-all">{selectedLog.transactionRef || 'N/A'}</div>
                             </div>
                         </div>
                         
                         <div>
                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-semibold text-slate-900">Request Parameters</h4>
+                                <h4 className="text-sm font-bold text-slate-900">Request Parameters</h4>
                                 <CopyButton text={JSON.stringify(selectedLog.details?.request || { input: selectedLog.input }, null, 2)} />
                              </div>
-                             <div className="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-x-auto">
+                             <div className="bg-slate-900 text-slate-300 p-4 rounded-lg font-mono text-xs overflow-x-auto shadow-inner">
                                 <pre>{JSON.stringify(selectedLog.details?.request || { input: selectedLog.input }, null, 2)}</pre>
                              </div>
                         </div>
 
                         <div>
                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-semibold text-slate-900">Response / Result</h4>
+                                <h4 className="text-sm font-bold text-slate-900">Response / Result</h4>
                                 <CopyButton text={JSON.stringify(selectedLog.details?.response || { message: selectedLog.message }, null, 2)} />
                              </div>
-                             <div className="bg-slate-900 text-emerald-400 p-3 rounded-lg font-mono text-xs overflow-x-auto">
+                             <div className="bg-slate-900 text-emerald-400 p-4 rounded-lg font-mono text-xs overflow-x-auto shadow-inner">
                                 <pre>{JSON.stringify(selectedLog.details?.response || { message: selectedLog.message }, null, 2)}</pre>
                              </div>
                         </div>
@@ -837,7 +850,7 @@ const Dashboard = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 + (i * 0.1) }}
                         onClick={() => onNavigate(tool.id)}
-                        className="group bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all cursor-pointer relative overflow-hidden"
+                        className="group bg-white p-6 rounded-2xl border border-slate-200 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all cursor-pointer relative overflow-hidden"
                     >
                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 opacity-50" />
                          
@@ -925,7 +938,7 @@ const App = () => {
     <div className="min-h-screen flex text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 relative z-10">
       
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col w-72 bg-white/90 backdrop-blur-md border-r border-white/20 fixed h-full z-20 shadow-sm">
+      <aside className="hidden lg:flex flex-col w-72 bg-white/95 backdrop-blur-md border-r border-slate-200 fixed h-full z-20 shadow-sm">
         <div className="p-8">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold font-display text-xl shadow-lg shadow-slate-900/20">
@@ -942,8 +955,8 @@ const App = () => {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 activeTab === item.id
-                  ? 'bg-slate-100 text-slate-900 shadow-sm font-semibold'
-                  : 'text-slate-500 hover:bg-white/50 hover:text-slate-900'
+                  ? 'bg-slate-100 text-slate-900 shadow-sm font-bold'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {item.icon}
@@ -968,7 +981,7 @@ const App = () => {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md border-b border-slate-200 z-30 px-6 py-4 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-slate-200 z-30 px-6 py-4 flex items-center justify-between">
          <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold font-display">N</div>
                 <span className="font-display font-bold text-xl">NovaID</span>
@@ -987,8 +1000,8 @@ const App = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="fixed inset-0 top-[73px] bg-white z-20 p-4 lg:hidden flex flex-col"
             >
-                <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="text-sm text-slate-500 mb-1">Available Credits</div>
+                <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="text-sm text-slate-500 mb-1 font-medium">Available Credits</div>
                     <div className="text-2xl font-bold text-slate-900">{balance}</div>
                 </div>
                 <nav className="space-y-2 flex-1">
@@ -1024,14 +1037,14 @@ const App = () => {
                 <h1 className="text-2xl lg:text-3xl font-display font-bold text-slate-900">
                     {navItems.find(n => n.id === activeTab)?.label}
                 </h1>
-                <p className="text-slate-500 mt-1">Manage and verify identities with precision.</p>
+                <p className="text-slate-500 mt-1 font-medium">Manage and verify identities with precision.</p>
             </div>
             <div className="hidden md:flex items-center gap-4">
                 <div className="text-right">
                     <div className="text-sm font-bold text-slate-900">Enterprise API</div>
-                    <div className="text-xs text-slate-500">v2.5.1 • Secure</div>
+                    <div className="text-xs text-slate-500 font-medium">v2.5.1 • Secure</div>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-100 shadow-sm overflow-hidden p-1">
+                <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-200 shadow-sm overflow-hidden p-1">
                    <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
                         <ShieldCheck size={20} />
                    </div>

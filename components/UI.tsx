@@ -14,7 +14,7 @@ export const Card: React.FC<CardProps> = ({ children, className = "", delay = 0 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className={`bg-white/80 rounded-2xl border border-white/20 shadow-xl shadow-blue-900/5 backdrop-blur-md ${className}`}
+      className={`bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-xl shadow-blue-900/5 ${className}`}
     >
       {children}
     </motion.div>
@@ -51,20 +51,20 @@ export const Button: React.FC<ButtonProps> = ({ children, isLoading, variant = '
 };
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string }> = ({ label, className = "", ...props }) => (
-  <div className="space-y-1.5">
-    {label && <label className="text-sm font-medium text-slate-600 ml-1">{label}</label>}
+  <div className="space-y-1.5 w-full">
+    {label && <label className="text-sm font-semibold text-slate-700 ml-1 block">{label}</label>}
     <input
-      className={`w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none placeholder:text-slate-400 ${className}`}
+      className={`w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all outline-none shadow-sm ${className}`}
       {...props}
     />
   </div>
 );
 
 export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string }> = ({ label, children, className = "", ...props }) => (
-  <div className="space-y-1.5">
-    {label && <label className="text-sm font-medium text-slate-600 ml-1">{label}</label>}
+  <div className="space-y-1.5 w-full">
+    {label && <label className="text-sm font-semibold text-slate-700 ml-1 block">{label}</label>}
     <select
-      className={`w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none appearance-none cursor-pointer ${className}`}
+      className={`w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all outline-none appearance-none cursor-pointer shadow-sm ${className}`}
       {...props}
     >
       {children}
@@ -73,8 +73,8 @@ export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { 
 );
 
 export const StatusBadge: React.FC<{ success: boolean; text?: string }> = ({ success, text }) => (
-  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-    success ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
+  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+    success ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
   }`}>
     {success ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
     {text || (success ? 'Verified' : 'Failed')}
@@ -83,9 +83,9 @@ export const StatusBadge: React.FC<{ success: boolean; text?: string }> = ({ suc
 
 export const Alert: React.FC<{ type: 'error' | 'success' | 'info'; title?: string; message: string }> = ({ type, title, message }) => {
   const styles = {
-    error: "bg-rose-50 text-rose-900 border-rose-100",
-    success: "bg-emerald-50 text-emerald-900 border-emerald-100",
-    info: "bg-blue-50 text-blue-900 border-blue-100"
+    error: "bg-rose-50 text-rose-900 border-rose-200",
+    success: "bg-emerald-50 text-emerald-900 border-emerald-200",
+    info: "bg-blue-50 text-blue-900 border-blue-200"
   };
   const icons = {
     error: <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />,
@@ -101,8 +101,8 @@ export const Alert: React.FC<{ type: 'error' | 'success' | 'info'; title?: strin
     >
       {icons[type]}
       <div>
-        {title && <h4 className="font-semibold text-sm mb-1">{title}</h4>}
-        <p className="text-sm opacity-90">{message}</p>
+        {title && <h4 className="font-bold text-sm mb-1">{title}</h4>}
+        <p className="text-sm opacity-90 leading-relaxed">{message}</p>
       </div>
     </motion.div>
   );
@@ -116,13 +116,13 @@ export const ResultDisplay: React.FC<{ data: any, title: string }> = ({ data, ti
       exit={{ opacity: 0, height: 0 }}
       className="mt-6"
     >
-      <div className="p-6 rounded-2xl bg-white/50 border border-slate-100 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-5">
+      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
            <svg width="100" height="100" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/></svg>
         </div>
 
         <div className="flex justify-between items-start mb-6">
-          <h3 className="text-lg font-display font-semibold text-slate-900">{title}</h3>
+          <h3 className="text-lg font-display font-bold text-slate-900">{title}</h3>
           <StatusBadge success={true} />
         </div>
 
@@ -135,10 +135,10 @@ export const ResultDisplay: React.FC<{ data: any, title: string }> = ({ data, ti
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
+                className="bg-slate-50 p-3 rounded-lg border border-slate-200"
               >
-                <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                <div className="font-medium text-slate-800 break-all">{String(value)}</div>
+                <div className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-semibold">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                <div className="font-medium text-slate-900 break-all">{String(value)}</div>
               </motion.div>
              );
           })}
@@ -160,7 +160,7 @@ export const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   return (
     <button 
       onClick={handleCopy}
-      className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+      className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 px-2 py-1 rounded-md"
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
       {copied ? 'Copied' : 'Copy'}
@@ -178,17 +178,17 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
                         animate={{ opacity: 1 }} 
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
                     />
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed left-0 right-0 top-0 bottom-0 m-auto w-full max-w-2xl h-fit max-h-[90vh] bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col border border-white/50"
+                        className="fixed left-0 right-0 top-0 bottom-0 m-auto w-full max-w-2xl h-fit max-h-[90vh] bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col border border-slate-200"
                     >
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <h3 className="font-display font-bold text-lg text-slate-900">{title}</h3>
-                            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500">
+                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -209,17 +209,17 @@ export const Pagination: React.FC<{ currentPage: number; totalPages: number; onP
             <button 
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200"
             >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4 text-slate-700" />
             </button>
-            <span className="text-sm text-slate-600 font-medium">Page {currentPage} of {totalPages}</span>
+            <span className="text-sm text-slate-700 font-semibold bg-white border border-slate-200 px-3 py-1.5 rounded-lg">Page {currentPage} of {totalPages}</span>
             <button 
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200"
             >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4 text-slate-700" />
             </button>
         </div>
     )
