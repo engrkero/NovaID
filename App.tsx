@@ -17,13 +17,14 @@ import {
   Wallet,
   LogOut,
   MessageSquare,
-  Users
+  Users,
+  PlusCircle
 } from 'lucide-react';
 import { VerificationType, NavItem, AuditLogEntry } from './types';
 import { NIGERIAN_BANKS } from './constants';
 import { verifyIdentity } from './services/geminiService';
 import { saveAuditLog, getAuditLogs, clearAuditLogs } from './services/auditService';
-import { purchaseCredits, validatePin, deductCredit, getBalance } from './services/creditService';
+import { purchaseCredits, validatePin, deductCredit, getBalance, hasSufficientBalance } from './services/creditService';
 import { Card, Button, Input, Select, ResultDisplay, Alert, Modal, Pagination, CopyButton } from './components/UI';
 
 // --- Auth / Credit Portal Components ---
@@ -40,11 +41,17 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
     const [generatedPin, setGeneratedPin] = useState<string | null>(null);
 
     const handleLogin = () => {
+        if (pin.length !== 4) {
+            setLoginError('Please enter a valid 4-digit PIN.');
+            return;
+        }
+
         const account = validatePin(pin);
+        
         if (account) {
             onLogin(pin);
         } else {
-            setLoginError('Invalid or expired PIN code.');
+            setLoginError('Access Denied: PIN not found or invalid.');
         }
     };
 
@@ -53,6 +60,11 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
             alert("Please enter your Email or WhatsApp number");
             return;
         }
+        if (credits < 1) {
+            alert("Minimum credit purchase is 1");
+            return;
+        }
+
         setBuying(true);
         purchaseCredits(
             credits, 
@@ -111,7 +123,7 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                 placeholder="0 0 0 0" 
                                 maxLength={4}
                                 type="text"
-                                className="text-center tracking-[1em] font-mono text-2xl py-4 font-bold text-slate-900 placeholder:text-slate-200"
+                                className="text-center tracking-[1em] font-mono text-2xl py-4 font-bold !text-slate-900 placeholder:!text-slate-400 !bg-white border-slate-300"
                                 value={pin}
                                 onChange={(e) => {
                                     setPin(e.target.value.replace(/\D/g,''));
@@ -137,28 +149,39 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                                 <>
                                     <div>
                                         <label className="text-sm font-bold text-slate-700 mb-2 block">Select Credits (₦50 / unit)</label>
-                                        <div className="grid grid-cols-4 gap-2">
+                                        <div className="grid grid-cols-4 gap-2 mb-3">
                                             {[1, 5, 10, 20].map(num => (
                                                 <button
                                                     key={num}
                                                     onClick={() => setCredits(num)}
-                                                    className={`py-3 rounded-xl border-2 font-bold transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
+                                                    className={`py-2 rounded-xl border-2 font-bold text-sm transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
                                                 >
                                                     {num}
                                                 </button>
                                             ))}
                                         </div>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold uppercase">Custom Amount:</span>
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                className="w-full pl-32 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
+                                                value={credits}
+                                                onChange={(e) => setCredits(Math.max(1, parseInt(e.target.value) || 0))}
+                                            />
+                                        </div>
                                     </div>
+
                                     <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200">
                                         <span className="text-sm font-medium text-slate-600">Total Cost:</span>
-                                        <span className="text-xl font-bold text-slate-900">₦{credits * 50}</span>
+                                        <span className="text-xl font-bold text-slate-900">₦{(credits * 50).toLocaleString()}</span>
                                     </div>
                                     <Input 
                                         label="Email or WhatsApp" 
                                         placeholder="e.g. user@email.com" 
                                         value={contact}
                                         onChange={(e) => setContact(e.target.value)}
-                                        className="py-3 font-medium text-slate-900"
+                                        className="py-3 font-medium !text-slate-900 !bg-white placeholder:!text-slate-400"
                                     />
                                     <Button className="w-full text-lg py-4" onClick={handlePurchase} isLoading={buying}>Proceed to Payment</Button>
                                 </>
@@ -221,17 +244,19 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         setError("BVN must be exactly 11 digits.");
         return;
     }
-    if (!deductCredit(activePin)) {
-        setError("Insufficient credits. Please top up.");
+    
+    // Check balance first without deduction
+    if (!hasSufficientBalance(activePin)) {
+        setError("Insufficient credits. Please top up to continue.");
         return;
     }
     
-    refreshBalance(); // Update UI
     setLoading(true);
     setError(null);
 
     try {
         const res = await verifyIdentity(VerificationType.BVN, { bvn });
+        
         saveAuditLog({
             type: VerificationType.BVN,
             input: `BVN: ${bvn}`,
@@ -241,6 +266,9 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         });
 
         if (res.success) {
+            // Deduct credit ONLY after successful API response
+            deductCredit(activePin);
+            refreshBalance();
             setResult(res.data);
         } else {
             setError(res.message);
@@ -277,7 +305,6 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
                 maxLength={11}
                 value={bvn}
                 onChange={(e) => {
-                    // Numeric Validation Logic
                     const val = e.target.value.replace(/\D/g, '');
                     setBvn(val);
                     setError(null);
@@ -306,17 +333,18 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         setError("NIN must be exactly 11 digits.");
         return;
     }
-    if (!deductCredit(activePin)) {
-        setError("Insufficient credits.");
+
+    if (!hasSufficientBalance(activePin)) {
+        setError("Insufficient credits. Please top up to continue.");
         return;
     }
 
-    refreshBalance();
     setLoading(true);
     setError(null);
 
     try {
         const res = await verifyIdentity(VerificationType.NIN, { nin });
+        
         saveAuditLog({
             type: VerificationType.NIN,
             input: `NIN: ${nin}`,
@@ -326,6 +354,8 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         });
 
         if (res.success) {
+            deductCredit(activePin);
+            refreshBalance();
             setResult(res.data);
         } else {
             setError(res.message);
@@ -385,22 +415,23 @@ const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBala
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = async () => {
-    // Basic Nigerian Phone Regex
     const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
     if (!phoneRegex.test(phone)) {
         setError("Invalid Nigerian phone number format.");
         return;
     }
-    if (!deductCredit(activePin)) {
-        setError("Insufficient credits.");
+
+    if (!hasSufficientBalance(activePin)) {
+        setError("Insufficient credits. Please top up to continue.");
         return;
     }
-    refreshBalance();
+
     setLoading(true);
     setError(null);
 
     try {
         const res = await verifyIdentity(VerificationType.PHONE, { phone });
+        
         saveAuditLog({
             type: VerificationType.PHONE,
             input: `Phone: ${phone}`,
@@ -410,6 +441,8 @@ const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBala
         });
 
         if (res.success) {
+            deductCredit(activePin);
+            refreshBalance();
             setResult(res.data);
         } else {
             setError(res.message);
@@ -464,17 +497,19 @@ const AccountVerification: React.FC<VerificationProps> = ({ activePin, refreshBa
         setError("Please enter a valid 10-digit account number.");
         return;
     }
-    if (!deductCredit(activePin)) {
-        setError("Insufficient credits.");
+
+    if (!hasSufficientBalance(activePin)) {
+        setError("Insufficient credits. Please top up to continue.");
         return;
     }
-    refreshBalance();
+
     setLoading(true);
     setError(null);
 
     try {
         const res = await verifyIdentity(VerificationType.ACCOUNT, { accountNumber: account, bankCode });
         const bankName = NIGERIAN_BANKS.find(b => b.code === bankCode)?.name || bankCode;
+        
         saveAuditLog({
             type: VerificationType.ACCOUNT,
             input: `Acct: ${account} (${bankName})`,
@@ -484,6 +519,8 @@ const AccountVerification: React.FC<VerificationProps> = ({ activePin, refreshBa
         });
 
         if (res.success) {
+            deductCredit(activePin);
+            refreshBalance();
             setResult(res.data);
         } else {
             setError(res.message);
@@ -543,16 +580,18 @@ const BvnMatch: React.FC<VerificationProps> = ({ activePin, refreshBalance }) =>
         setError("Please provide both Account Number and BVN.");
         return;
     }
-    if (!deductCredit(activePin)) {
-        setError("Insufficient credits.");
+
+    if (!hasSufficientBalance(activePin)) {
+        setError("Insufficient credits. Please top up to continue.");
         return;
     }
-    refreshBalance();
+
     setLoading(true);
     setError(null);
 
     try {
         const res = await verifyIdentity(VerificationType.BVN_MATCH, { accountNumber: account, bankCode, bvn });
+        
         saveAuditLog({
             type: VerificationType.BVN_MATCH,
             input: `Match: ${bvn} vs ${account}`,
@@ -562,6 +601,8 @@ const BvnMatch: React.FC<VerificationProps> = ({ activePin, refreshBalance }) =>
         });
 
         if (res.success) {
+            deductCredit(activePin);
+            refreshBalance();
             setResult(res.data);
         } else {
             setError(res.message);
@@ -640,7 +681,7 @@ const AuditLogs = () => {
     const [filterType, setFilterType] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-    const itemsPerPage = 8;
+    const itemsPerPage = 12; // Increased due to compact view
     
     useEffect(() => {
         const logs = getAuditLogs();
@@ -666,7 +707,7 @@ const AuditLogs = () => {
     }, [searchTerm, filterType, allLogs]);
 
     const handleClear = () => {
-        if(confirm("Are you sure you want to clear the audit logs?")) {
+        if(confirm("Are you sure you want to PERMANENTLY delete all audit logs?")) {
             clearAuditLogs();
             setAllLogs([]);
             setFilteredLogs([]);
@@ -701,7 +742,7 @@ const AuditLogs = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input 
                                 type="text"
-                                placeholder="Search logs..." 
+                                placeholder="Search logs (Input, ID, Message)..." 
                                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -727,44 +768,50 @@ const AuditLogs = () => {
                         </div>
                     ) : (
                         <>
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50">
-                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-lg">Time</th>
-                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Type</th>
-                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Details</th>
-                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                                            <th className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tr-lg">Action</th>
+                                        <tr className="border-b border-slate-200 bg-slate-50/50">
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Time</th>
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Input</th>
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Ref</th>
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {paginatedLogs.map((log) => (
-                                            <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="p-3 text-sm text-slate-500 whitespace-nowrap">
-                                                    {new Date(log.timestamp).toLocaleTimeString()} 
-                                                    <span className="text-xs ml-1 opacity-60 block">{new Date(log.timestamp).toLocaleDateString()}</span>
+                                            <tr key={log.id} className="hover:bg-blue-50/30 transition-colors group">
+                                                <td className="p-2 text-xs text-slate-500 whitespace-nowrap">
+                                                    <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                    <div className="opacity-60 text-[10px]">{new Date(log.timestamp).toLocaleDateString()}</div>
                                                 </td>
-                                                <td className="p-3 text-sm font-bold text-slate-800">
+                                                <td className="p-2 text-xs font-bold text-slate-800">
                                                     {log.type === VerificationType.CREDIT_PURCHASE ? 
                                                         <span className="text-emerald-600 flex items-center gap-1"><Wallet className="w-3 h-3"/> Purchase</span> : 
                                                         log.type.replace(/_/g, ' ')
                                                     }
                                                 </td>
-                                                <td className="p-3 text-sm text-slate-600 font-mono bg-slate-50/50 rounded">{log.input}</td>
-                                                <td className="p-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                                                <td className="p-2 text-xs text-slate-600 font-mono max-w-[150px] truncate" title={log.input}>
+                                                    {log.input}
+                                                </td>
+                                                <td className="p-2 text-xs text-slate-400 font-mono max-w-[100px] truncate" title={log.transactionRef}>
+                                                    {log.transactionRef || '-'}
+                                                </td>
+                                                <td className="p-2">
+                                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                                                         log.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                                                     }`}>
                                                         {log.status}
                                                     </span>
                                                 </td>
-                                                <td className="p-3">
+                                                <td className="p-2 text-right">
                                                     <button 
                                                         onClick={() => setSelectedLog(log)}
-                                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-1 rounded"
+                                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-1 rounded"
                                                     >
-                                                        Details <ExternalLink className="w-3 h-3"/>
+                                                        Details
                                                     </button>
                                                 </td>
                                             </tr>
@@ -792,11 +839,11 @@ const AuditLogs = () => {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                                 <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Transaction ID</div>
-                                <div className="font-mono text-slate-800 break-all">{selectedLog.id}</div>
+                                <div className="font-mono text-slate-800 break-all text-xs">{selectedLog.id}</div>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Reference</div>
-                                <div className="font-mono text-slate-800 break-all">{selectedLog.transactionRef || 'N/A'}</div>
+                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Reference (Paystack)</div>
+                                <div className="font-mono text-slate-800 break-all text-xs">{selectedLog.transactionRef || 'N/A'}</div>
                             </div>
                         </div>
                         

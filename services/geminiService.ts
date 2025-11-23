@@ -1,23 +1,47 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { VerificationType, VerificationResponse } from "../types";
 
-// Initialize Gemini Client
+/**
+ * ==================================================================================
+ *  NOVA ID - VERIFICATION SERVICE LAYER
+ * ==================================================================================
+ * 
+ *  CURRENT MODE: SIMULATION (Uses Gemini AI)
+ *  
+ *  TO INTEGRATE REAL APIS:
+ *  1. Replace the 'verifyIdentity' function body below.
+ *  2. Use 'fetch' or 'axios' to call your backend or the Identity Provider directly.
+ *  3. Ensure you map the API response to the 'VerificationResponse' interface.
+ * 
+ *  RECOMMENDED PROVIDERS: Paystack, Dojah, Seamfix, QoreID
+ * 
+ * ==================================================================================
+ */
+
+// Initialize Gemini Client (For Simulation Only)
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * Simulates Paystack/Identity APIs using Gemini to generate realistic dummy data.
- * In a real app, this would call the actual Paystack endpoints.
- */
 export const verifyIdentity = async (
   type: VerificationType,
   payload: Record<string, string>
 ): Promise<VerificationResponse> => {
   
+  // --- INTEGRATION POINT: REPLACE THIS BLOCK FOR PRODUCTION ---
+  // Example Production Code:
+  // try {
+  //    const response = await fetch(`https://api.yourdomain.com/verify/${type}`, { 
+  //        method: 'POST', 
+  //        body: JSON.stringify(payload) 
+  //    });
+  //    return await response.json();
+  // } catch (e) { ... }
+  // -----------------------------------------------------------
+
   const model = "gemini-2.5-flash";
   let prompt = "";
   let schema = null;
 
-  // Common instruction for all requests
+  // Common instruction for all requests (Simulation Logic)
   const systemInstruction = `
     You are a high-performance Identity Verification API Simulator for Nigeria.
     You replace actual Paystack/NIBSS APIs for demonstration purposes.

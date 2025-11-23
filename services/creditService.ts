@@ -89,12 +89,19 @@ export const validatePin = (pin: string): CreditAccount | null => {
     return accounts[pin] || null;
 };
 
+export const hasSufficientBalance = (pin: string): boolean => {
+    const accounts = getAccounts();
+    const account = accounts[pin];
+    return !!account && account.balance > 0;
+};
+
 export const deductCredit = (pin: string): boolean => {
     const accounts = getAccounts();
     const account = accounts[pin];
 
     if (!account) return false;
     
+    // Double check balance
     if (account.balance < 1) {
         return false;
     }
