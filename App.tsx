@@ -54,7 +54,8 @@ const AuthPortal = ({ onLogin }: { onLogin: (auth: AuthData) => void }) => {
         setError('');
 
         try {
-             const res = await fetch('/api/auth/register', {
+             const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+             const res = await fetch(endpoint, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({ email, pin })
@@ -84,13 +85,13 @@ const AuthPortal = ({ onLogin }: { onLogin: (auth: AuthData) => void }) => {
 
                 <div className="flex p-1 bg-slate-100 rounded-xl mb-6 border border-slate-200">
                     <button 
-                        onClick={() => setMode('login')}
+                        onClick={() => { setMode('login'); setError(''); }}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Login
                     </button>
                     <button 
-                        onClick={() => setMode('register')}
+                        onClick={() => { setMode('register'); setError(''); }}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'register' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Register
@@ -114,7 +115,16 @@ const AuthPortal = ({ onLogin }: { onLogin: (auth: AuthData) => void }) => {
                         value={pin}
                         onChange={(e) => { setPin(e.target.value.replace(/\D/g,'')); setError(''); }}
                     />
-                    {error && <div className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium">{error}</div>}
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium flex items-center justify-center gap-2"
+                        >
+                            <AlertCircle size={16} />
+                            {error}
+                        </motion.div>
+                    )}
                     <Button
                         className="w-full text-lg py-4"
                         onClick={handleAuth}
