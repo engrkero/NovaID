@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -12,137 +11,75 @@ import {
   ChevronRight,
   FileText,
   Trash2,
-  ExternalLink,
-  Filter,
   Lock,
   Wallet,
   LogOut,
-  MessageSquare,
   Users,
-  PlusCircle,
-  HelpCircle,
-  Mail,
   Copy,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
-import { VerificationType, NavItem, AuditLogEntry } from './types';
+import { VerificationType, NavItem } from './types';
 import { NIGERIAN_BANKS } from './constants';
-import { verifyIdentity } from './services/geminiService';
-import { saveAuditLog, getAuditLogs, clearAuditLogs } from './services/auditService';
-import { purchaseCredits, validatePin, deductCredit, getBalance, hasSufficientBalance } from './services/creditService';
-import { sendSimulatedNotification } from './services/notificationService';
-import { Card, Button, Input, Select, ResultDisplay, Alert, Modal, Pagination, CopyButton } from './components/UI';
+import { verifyIdentity } from './src/services/apiService';
+import { Card, Button, Input, Select, ResultDisplay, Alert, Modal, CopyButton } from './components/UI';
+import { AdminDashboard as AdminView } from './src/pages/AdminDashboard';
 
-// --- Auth / Credit Portal Components ---
+// Add new type for Auth
+interface AuthData {
+    token: string;
+    userId: string;
+}
 
-const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
-    const [mode, setMode] = useState<'login' | 'buy'>('login');
+// --- Auth / Wallet Portal Components ---
+
+const AuthPortal = ({ onLogin }: { onLogin: (auth: AuthData) => void }) => {
+    const [mode, setMode] = useState<'login' | 'register'>('login');
+    const [email, setEmail] = useState('');
     const [pin, setPin] = useState('');
-    const [loginError, setLoginError] = useState('');
-    const [loggingIn, setLoggingIn] = useState(false);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    // Buy Mode States
-    const [amountInput, setAmountInput] = useState<string>('1');
-    const [contact, setContact] = useState('');
-    const [buying, setBuying] = useState(false);
-    const [notificationStatus, setNotificationStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
-    const [generatedPin, setGeneratedPin] = useState<string | null>(null);
-    const [transactionRef, setTransactionRef] = useState<string>('');
-    const [copiedPin, setCopiedPin] = useState(false);
-
-    // Derived credits from input
-    const credits = parseInt(amountInput) || 0;
-    const totalCost = credits * 50;
-
-    const handleLogin = async () => {
+    const handleAuth = async () => {
+        if (!email || !email.includes('@')) {
+            setError('Please enter a valid email.');
+            return;
+        }
         if (pin.length !== 4) {
-            setLoginError('Please enter a valid 4-digit PIN.');
+            setError('Please enter a valid 4-digit PIN.');
             return;
         }
 
-        setLoggingIn(true);
-        setLoginError('');
-        
-        // Simulate robust validation delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setLoading(true);
+        setError('');
 
-        const account = validatePin(pin);
-        
-        if (account) {
-            onLogin(pin);
-            // No need to setLoggingIn(false) as component will unmount/switch view
-        } else {
-            setLoginError('Access Denied: PIN not found or invalid.');
-            setLoggingIn(false);
-        }
-    };
+        try {
+             const res = await fetch('/api/auth/register', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ email, pin })
+             });
+             const data = await res.json();
 
-    const handlePurchase = () => {
-        if (!contact) {
-            alert("Please enter your Email or WhatsApp number");
-            return;
-        }
-        if (credits < 1) {
-            alert("Minimum credit purchase is 1");
-            return;
-        }
-
-        setBuying(true);
-        setNotificationStatus('idle');
-
-        purchaseCredits(
-            credits, 
-            contact, 
-            async (newPin, ref) => {
-                setTransactionRef(ref);
-                
-                // 1. Payment Success - Log it
-                saveAuditLog({
-                    type: VerificationType.CREDIT_PURCHASE,
-                    input: `Bought ${credits} credits`,
-                    status: 'success',
-                    message: 'Payment successful',
-                    transactionRef: ref,
-                    details: { credits, contact, pin: newPin }
-                });
-
-                // 2. Trigger Notification
-                setNotificationStatus('sending');
-                await sendSimulatedNotification(contact, newPin, credits, ref);
-                setNotificationStatus('sent');
-                
-                // 3. Log Notification
-                saveAuditLog({
-                    type: VerificationType.CREDIT_PURCHASE,
-                    input: `Email Notification`,
-                    status: 'success',
-                    message: `PIN sent to ${contact}`,
-                    transactionRef: ref,
-                    details: { method: 'Simulated Email', recipient: contact }
-                });
-
-                setGeneratedPin(newPin);
-                setBuying(false);
-            },
-            () => setBuying(false)
-        );
-    };
-
-    const handleCopyPin = () => {
-        if (generatedPin) {
-            navigator.clipboard.writeText(generatedPin);
-            setCopiedPin(true);
-            setTimeout(() => setCopiedPin(false), 2000);
+             if (res.ok && data.token) {
+                 onLogin(data);
+             } else {
+                 setError(data.error || 'Authentication failed');
+             }
+        } catch (e) {
+             setError('Network error. Please try again.');
+        } finally {
+             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+        <div className="min-h-screen flex items-center justify-center p-4 relative z-10 bg-slate-50">
             <Card className="w-full max-w-md p-8 !bg-white shadow-2xl border-slate-200">
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white mx-auto flex items-center justify-center text-2xl font-bold font-display mb-4 shadow-xl">N</div>
-                    <h1 className="text-3xl font-display font-bold text-slate-900">NovaID Access</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Secure Identity Verification Portal</p>
+                    <h1 className="text-3xl font-display font-bold text-slate-900">NovaID</h1>
+                    <p className="text-slate-500 mt-2 font-medium">Enterprise Identity Verification</p>
                 </div>
 
                 <div className="flex p-1 bg-slate-100 rounded-xl mb-6 border border-slate-200">
@@ -150,172 +87,42 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
                         onClick={() => setMode('login')}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Enter PIN
+                        Login
                     </button>
                     <button 
-                        onClick={() => setMode('buy')}
-                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'buy' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setMode('register')}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'register' ? 'bg-white shadow-sm text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Buy Credits
+                        Register
                     </button>
                 </div>
 
-                <AnimatePresence mode="wait">
-                    {mode === 'login' ? (
-                        <motion.div 
-                            key="login"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="space-y-6"
-                        >
-                            <Input 
-                                label="Access PIN" 
-                                placeholder="0 0 0 0" 
-                                maxLength={4}
-                                type="text"
-                                className="text-center tracking-[1em] font-mono text-2xl py-4 font-bold !text-slate-900 placeholder:!text-slate-400 !bg-white border-slate-300"
-                                value={pin}
-                                onChange={(e) => {
-                                    setPin(e.target.value.replace(/\D/g,''));
-                                    setLoginError('');
-                                }}
-                            />
-                            {loginError && <div className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium">{loginError}</div>}
-                            <Button 
-                                className="w-full text-lg py-4" 
-                                onClick={handleLogin}
-                                isLoading={loggingIn}
-                            >
-                                {loggingIn ? 'Validating...' : 'Unlock Dashboard'}
-                            </Button>
-                            
-                            <p className="text-xs text-center text-slate-400">
-                                Don't have a code? Switch to "Buy Credits" above.
-                            </p>
-                        </motion.div>
-                    ) : (
-                        <motion.div 
-                            key="buy"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="space-y-6"
-                        >
-                            {!generatedPin ? (
-                                <>
-                                    <div>
-                                        <label className="text-sm font-bold text-slate-700 mb-2 block">Select Credits (₦50 / unit)</label>
-                                        <div className="grid grid-cols-4 gap-2 mb-3">
-                                            {[1, 5, 10, 20].map(num => (
-                                                <button
-                                                    key={num}
-                                                    onClick={() => setAmountInput(num.toString())}
-                                                    className={`py-2 rounded-xl border-2 font-bold text-sm transition-all ${credits === num ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
-                                                >
-                                                    {num}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold uppercase">Custom:</span>
-                                            <input 
-                                                type="number"
-                                                min="1"
-                                                placeholder="Enter amount"
-                                                className="w-full pl-20 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
-                                                value={amountInput}
-                                                onChange={(e) => setAmountInput(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200">
-                                        <span className="text-sm font-medium text-slate-600">Total Cost:</span>
-                                        <span className="text-xl font-bold text-slate-900">₦{totalCost.toLocaleString()}</span>
-                                    </div>
-                                    <Input 
-                                        label="Email or WhatsApp" 
-                                        placeholder="e.g. user@email.com" 
-                                        value={contact}
-                                        onChange={(e) => setContact(e.target.value)}
-                                        className="py-3 font-medium !text-slate-900 !bg-white placeholder:!text-slate-400"
-                                    />
-                                    <Button 
-                                        className="w-full text-lg py-4" 
-                                        onClick={handlePurchase} 
-                                        isLoading={buying || notificationStatus === 'sending'}
-                                        disabled={credits < 1}
-                                    >
-                                        {notificationStatus === 'sending' ? 'Sending Email...' : 'Proceed to Payment'}
-                                    </Button>
-                                </>
-                            ) : (
-                                <div className="text-center space-y-6">
-                                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                                        <Wallet className="w-8 h-8" />
-                                    </div>
-                                    
-                                    <div>
-                                        <h3 className="font-bold text-xl text-slate-900">Order Confirmed!</h3>
-                                        <p className="text-slate-500 text-sm mt-1">Your secure access code has been generated.</p>
-                                    </div>
-
-                                    <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 p-4 opacity-10"><Lock size={80}/></div>
-                                        <div className="flex justify-between items-center mb-2">
-                                             <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Your Access PIN</p>
-                                             <button 
-                                                onClick={handleCopyPin}
-                                                className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg backdrop-blur-sm"
-                                             >
-                                                {copiedPin ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} />}
-                                                {copiedPin ? 'Copied' : 'Copy PIN'}
-                                             </button>
-                                        </div>
-                                        <div className="text-5xl font-mono font-bold tracking-widest">{generatedPin}</div>
-                                    </div>
-
-                                    <div className="text-xs text-slate-600 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left leading-relaxed flex gap-3 items-start">
-                                        <Mail className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                        <div>
-                                            <p className="mb-2"><strong>Notification Sent!</strong> We've also emailed this code to <b>{contact}</b> for your records.</p>
-                                            <p>It contains <strong>{credits} credits</strong> valid for immediate use.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Support Fallback */}
-                                    <div className="pt-2 border-t border-slate-100">
-                                        <p className="text-xs text-slate-400 mb-2">Code didn't arrive?</p>
-                                        <a 
-                                            href={`https://wa.me/2349015183471?text=Hello Admin, I purchased ${credits} credits but didn't receive my code. Transaction Ref: ${transactionRef}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors bg-slate-50 hover:bg-emerald-50 px-3 py-2 rounded-lg border border-slate-200"
-                                        >
-                                            <HelpCircle className="w-3 h-3" />
-                                            Contact Admin (WhatsApp)
-                                        </a>
-                                    </div>
-                                    
-                                    <div className="flex gap-3 pt-2">
-                                        <Button variant="secondary" className="flex-1" onClick={() => {
-                                            setGeneratedPin(null);
-                                            setAmountInput('');
-                                            setContact('');
-                                            setMode('buy');
-                                        }}>Buy More</Button>
-                                        <Button className="flex-1" onClick={() => {
-                                            setMode('login');
-                                            setPin(generatedPin);
-                                            setGeneratedPin(null);
-                                        }}>Login Now</Button>
-                                    </div>
-                                </div>
-                            )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <div className="space-y-4">
+                    <Input
+                        label="Email Address"
+                        placeholder="you@company.com"
+                        type="email"
+                        value={email}
+                        onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    />
+                    <Input
+                        label="Secure 4-Digit PIN"
+                        placeholder="0 0 0 0"
+                        maxLength={4}
+                        type="password"
+                        className="text-center tracking-[1em] font-mono text-2xl py-4 font-bold"
+                        value={pin}
+                        onChange={(e) => { setPin(e.target.value.replace(/\D/g,'')); setError(''); }}
+                    />
+                    {error && <div className="text-rose-600 text-sm text-center bg-rose-50 p-3 rounded-lg border border-rose-100 font-medium">{error}</div>}
+                    <Button
+                        className="w-full text-lg py-4"
+                        onClick={handleAuth}
+                        isLoading={loading}
+                    >
+                        {mode === 'login' ? 'Access Dashboard' : 'Create Account'}
+                    </Button>
+                </div>
             </Card>
         </div>
     );
@@ -325,11 +132,11 @@ const CreditPortal = ({ onLogin }: { onLogin: (pin: string) => void }) => {
 // --- Verification Components ---
 
 interface VerificationProps {
-    activePin: string;
-    refreshBalance: () => void;
+    auth: AuthData;
+    onVerified: () => void; // Trigger balance refresh
 }
 
-const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalance }) => {
+const BVNVerification: React.FC<VerificationProps> = ({ auth, onVerified }) => {
   const [bvn, setBvn] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -341,31 +148,14 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         return;
     }
     
-    // Check balance first without deduction
-    if (!hasSufficientBalance(activePin)) {
-        setError("Insufficient credits. Please top up to continue.");
-        return;
-    }
-    
     setLoading(true);
     setError(null);
 
     try {
-        const res = await verifyIdentity(VerificationType.BVN, { bvn });
-        
-        saveAuditLog({
-            type: VerificationType.BVN,
-            input: `BVN: ${bvn}`,
-            status: res.success ? 'success' : 'failed',
-            message: res.message,
-            details: { request: { bvn }, response: res, usedPin: activePin }
-        });
-
+        const res = await verifyIdentity(VerificationType.BVN, { bvn }, auth.token);
         if (res.success) {
-            // Deduct credit ONLY after successful API response
-            deductCredit(activePin);
-            refreshBalance();
             setResult(res.data);
+            onVerified();
         } else {
             setError(res.message);
         }
@@ -382,7 +172,7 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         <div className="p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-display font-bold text-slate-900">BVN Resolution</h2>
-            <p className="text-slate-500 mt-1">Verify identity using Bank Verification Number. Cost: 1 Credit</p>
+            <p className="text-slate-500 mt-1">Verify identity using Bank Verification Number. Cost: ₦50</p>
           </div>
           
           <AnimatePresence>
@@ -418,7 +208,7 @@ const BVNVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
   );
 };
 
-const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalance }) => {
+const NINVerification: React.FC<VerificationProps> = ({ auth, onVerified }) => {
   const [nin, setNin] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -430,29 +220,14 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         return;
     }
 
-    if (!hasSufficientBalance(activePin)) {
-        setError("Insufficient credits. Please top up to continue.");
-        return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-        const res = await verifyIdentity(VerificationType.NIN, { nin });
-        
-        saveAuditLog({
-            type: VerificationType.NIN,
-            input: `NIN: ${nin}`,
-            status: res.success ? 'success' : 'failed',
-            message: res.message,
-            details: { request: { nin }, response: res, usedPin: activePin }
-        });
-
+        const res = await verifyIdentity(VerificationType.NIN, { nin }, auth.token);
         if (res.success) {
-            deductCredit(activePin);
-            refreshBalance();
             setResult(res.data);
+            onVerified();
         } else {
             setError(res.message);
         }
@@ -469,7 +244,7 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
         <div className="p-8">
            <div className="mb-6">
             <h2 className="text-2xl font-display font-bold text-slate-900">NIN Lookup</h2>
-            <p className="text-slate-500 mt-1">Retrieve NIMC data. Cost: 1 Credit</p>
+            <p className="text-slate-500 mt-1">Retrieve NIMC data. Cost: ₦50</p>
           </div>
 
           <AnimatePresence>
@@ -504,477 +279,34 @@ const NINVerification: React.FC<VerificationProps> = ({ activePin, refreshBalanc
   );
 };
 
-const PhoneVerification: React.FC<VerificationProps> = ({ activePin, refreshBalance }) => {
-  const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = async () => {
-    const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
-    if (!phoneRegex.test(phone)) {
-        setError("Invalid Nigerian phone number format.");
-        return;
-    }
-
-    if (!hasSufficientBalance(activePin)) {
-        setError("Insufficient credits. Please top up to continue.");
-        return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-        const res = await verifyIdentity(VerificationType.PHONE, { phone });
-        
-        saveAuditLog({
-            type: VerificationType.PHONE,
-            input: `Phone: ${phone}`,
-            status: res.success ? 'success' : 'failed',
-            message: res.message,
-            details: { request: { phone }, response: res, usedPin: activePin }
-        });
-
-        if (res.success) {
-            deductCredit(activePin);
-            refreshBalance();
-            setResult(res.data);
-        } else {
-            setError(res.message);
-        }
-    } catch (e) {
-        setError("Error resolving phone details.");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <Card>
-        <div className="p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-display font-bold text-slate-900">Phone Intel</h2>
-            <p className="text-slate-500 mt-1">Caller identification. Cost: 1 Credit</p>
-          </div>
-          <AnimatePresence>
-            {error && <div className="mb-6"><Alert type="error" title="Error" message={error} /></div>}
-          </AnimatePresence>
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 w-full">
-              <Input 
-                label="Phone Number" 
-                placeholder="08012345678" 
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
+const DisabledFeature = ({ title, desc }: { title: string, desc: string }) => (
+    <div className="max-w-2xl mx-auto opacity-60 pointer-events-none">
+        <Card>
+            <div className="p-8 relative">
+                <div className="absolute top-4 right-4 bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                    <AlertCircle size={14} /> Coming Soon
+                </div>
+                <div className="mb-6">
+                    <h2 className="text-2xl font-display font-bold text-slate-900">{title}</h2>
+                    <p className="text-slate-500 mt-1">{desc}</p>
+                </div>
+                <div className="space-y-4">
+                    <Input label="Input Field" placeholder="Currently disabled..." disabled />
+                    <Button disabled className="w-full bg-slate-300 text-slate-500">Feature Disabled</Button>
+                </div>
             </div>
-            <Button className="w-full md:w-auto" onClick={handleVerify} isLoading={loading}>Resolve</Button>
-          </div>
-           <AnimatePresence>
-            {result && <ResultDisplay title="Subscriber Details" data={result} />}
-          </AnimatePresence>
-        </div>
-      </Card>
+        </Card>
     </div>
-  );
-};
+);
 
-const AccountVerification: React.FC<VerificationProps> = ({ activePin, refreshBalance }) => {
-  const [account, setAccount] = useState('');
-  const [bankCode, setBankCode] = useState(NIGERIAN_BANKS[0].code);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleVerify = async () => {
-    if (!account || account.length !== 10) {
-        setError("Please enter a valid 10-digit account number.");
-        return;
-    }
-
-    if (!hasSufficientBalance(activePin)) {
-        setError("Insufficient credits. Please top up to continue.");
-        return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-        const res = await verifyIdentity(VerificationType.ACCOUNT, { accountNumber: account, bankCode });
-        const bankName = NIGERIAN_BANKS.find(b => b.code === bankCode)?.name || bankCode;
-        
-        saveAuditLog({
-            type: VerificationType.ACCOUNT,
-            input: `Acct: ${account} (${bankName})`,
-            status: res.success ? 'success' : 'failed',
-            message: res.message,
-            details: { request: { account, bankCode, bankName }, response: res, usedPin: activePin }
-        });
-
-        if (res.success) {
-            deductCredit(activePin);
-            refreshBalance();
-            setResult(res.data);
-        } else {
-            setError(res.message);
-        }
-    } catch (e) {
-        setError("Bank account resolution failed.");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <Card>
-        <div className="p-8">
-           <div className="mb-6">
-            <h2 className="text-2xl font-display font-bold text-slate-900">Account Resolution</h2>
-            <p className="text-slate-500 mt-1">Verify bank account ownership. Cost: 1 Credit</p>
-          </div>
-          <AnimatePresence>
-            {error && <div className="mb-6"><Alert type="error" title="Error" message={error} /></div>}
-          </AnimatePresence>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <Select label="Bank" value={bankCode} onChange={(e) => setBankCode(e.target.value)}>
-              {NIGERIAN_BANKS.map((bank) => (
-                <option key={bank.code} value={bank.code}>{bank.name}</option>
-              ))}
-            </Select>
-            <Input 
-              label="Account Number" 
-              placeholder="1234567890" 
-              maxLength={10}
-              value={account}
-              onChange={(e) => setAccount(e.target.value.replace(/\D/g, ''))}
-            />
-          </div>
-          <Button className="w-full" onClick={handleVerify} isLoading={loading}>Resolve Account Name</Button>
-           <AnimatePresence>
-            {result && <ResultDisplay title="Account Details" data={result} />}
-          </AnimatePresence>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const BvnMatch: React.FC<VerificationProps> = ({ activePin, refreshBalance }) => {
-  const [account, setAccount] = useState('');
-  const [bvn, setBvn] = useState('');
-  const [bankCode, setBankCode] = useState(NIGERIAN_BANKS[0].code);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleVerify = async () => {
-    if (!account || !bvn) {
-        setError("Please provide both Account Number and BVN.");
-        return;
-    }
-
-    if (!hasSufficientBalance(activePin)) {
-        setError("Insufficient credits. Please top up to continue.");
-        return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-        const res = await verifyIdentity(VerificationType.BVN_MATCH, { accountNumber: account, bankCode, bvn });
-        
-        saveAuditLog({
-            type: VerificationType.BVN_MATCH,
-            input: `Match: ${bvn} vs ${account}`,
-            status: res.success ? 'success' : 'failed',
-            message: res.message,
-            details: { request: { account, bvn, bankCode }, response: res, usedPin: activePin }
-        });
-
-        if (res.success) {
-            deductCredit(activePin);
-            refreshBalance();
-            setResult(res.data);
-        } else {
-            setError(res.message);
-        }
-    } catch (e) {
-        setError("Match verification process error.");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <Card>
-        <div className="p-8">
-           <div className="mb-6">
-            <h2 className="text-2xl font-display font-bold text-slate-900">BVN Match</h2>
-            <p className="text-slate-500 mt-1">Cross-reference BVN. Cost: 1 Credit</p>
-          </div>
-          <AnimatePresence>
-            {error && <div className="mb-6"><Alert type="error" title="Error" message={error} /></div>}
-          </AnimatePresence>
-          <div className="space-y-4 mb-6">
-             <Select label="Bank" value={bankCode} onChange={(e) => setBankCode(e.target.value)}>
-              {NIGERIAN_BANKS.map((bank) => (
-                <option key={bank.code} value={bank.code}>{bank.name}</option>
-              ))}
-            </Select>
-            <Input 
-              label="Account Number" 
-              placeholder="1234567890" 
-              maxLength={10}
-              value={account}
-              onChange={(e) => setAccount(e.target.value.replace(/\D/g, ''))}
-            />
-            <Input 
-              label="BVN to Match" 
-              placeholder="22223333444" 
-              maxLength={11}
-              value={bvn}
-              onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
-            />
-          </div>
-          <Button className="w-full" onClick={handleVerify} isLoading={loading}>Run Match Analysis</Button>
-           <AnimatePresence>
-            {result && (
-                <div className="mt-6">
-                     <div className={`p-4 rounded-xl border ${result.isMatch ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'} flex items-center gap-3`}>
-                        {result.isMatch ? (
-                            <div className="p-2 bg-emerald-100 rounded-full text-emerald-600"><ShieldCheck className="w-6 h-6"/></div>
-                        ) : (
-                            <div className="p-2 bg-rose-100 rounded-full text-rose-600"><X className="w-6 h-6"/></div>
-                        )}
-                        <div>
-                            <h4 className={`font-bold ${result.isMatch ? 'text-emerald-900' : 'text-rose-900'}`}>
-                                {result.isMatch ? 'Identity Matched' : 'Mismatch Detected'}
-                            </h4>
-                            <p className="text-sm opacity-80">
-                                The account details {result.isMatch ? 'correspond' : 'do not correspond'} to the provided BVN.
-                            </p>
-                        </div>
-                     </div>
-                </div>
-            )}
-          </AnimatePresence>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const AuditLogs = () => {
-    const [allLogs, setAllLogs] = useState<AuditLogEntry[]>([]);
-    const [filteredLogs, setFilteredLogs] = useState<AuditLogEntry[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('ALL');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-    const itemsPerPage = 12; // Increased due to compact view
-    
-    useEffect(() => {
-        const logs = getAuditLogs();
-        setAllLogs(logs);
-        setFilteredLogs(logs);
-    }, []);
-
-    useEffect(() => {
-        let result = allLogs;
-        if (filterType !== 'ALL') {
-            result = result.filter(log => log.type === filterType);
-        }
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            result = result.filter(log => 
-                log.input.toLowerCase().includes(term) || 
-                log.message.toLowerCase().includes(term) ||
-                log.id.toLowerCase().includes(term)
-            );
-        }
-        setFilteredLogs(result);
-        setCurrentPage(1); 
-    }, [searchTerm, filterType, allLogs]);
-
-    const handleClear = () => {
-        if(confirm("Are you sure you want to PERMANENTLY delete all audit logs?")) {
-            clearAuditLogs();
-            setAllLogs([]);
-            setFilteredLogs([]);
-        }
-    };
-
-    const paginatedLogs = filteredLogs.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-
-    return (
-        <div className="max-w-6xl mx-auto">
-             <Card>
-                <div className="p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                        <div>
-                            <h2 className="text-xl font-display font-bold text-slate-900">Audit Trail</h2>
-                            <p className="text-slate-500 text-sm mt-1">Local logs of verifications & purchases.</p>
-                        </div>
-                         {allLogs.length > 0 && (
-                            <Button variant="outline" onClick={handleClear} className="!py-2 !px-4 text-xs w-full md:w-auto">
-                                <Trash2 className="w-4 h-4" /> Clear Logs
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4 mb-6">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input 
-                                type="text"
-                                placeholder="Search logs (Input, ID, Message)..." 
-                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <div className="w-full md:w-48">
-                             <Select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                                <option value="ALL">All Types</option>
-                                <option value={VerificationType.BVN}>BVN</option>
-                                <option value={VerificationType.NIN}>NIN</option>
-                                <option value={VerificationType.PHONE}>Phone</option>
-                                <option value={VerificationType.ACCOUNT}>Account</option>
-                                <option value={VerificationType.BVN_MATCH}>BVN Match</option>
-                                <option value={VerificationType.CREDIT_PURCHASE}>Purchases</option>
-                            </Select>
-                        </div>
-                    </div>
-
-                    {filteredLogs.length === 0 ? (
-                        <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
-                            <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3"/>
-                            <p className="text-slate-500 font-medium">No records found</p>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="overflow-x-auto rounded-lg border border-slate-200">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50/50">
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Time</th>
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Input</th>
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Ref</th>
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                                            <th className="p-2 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {paginatedLogs.map((log) => (
-                                            <tr key={log.id} className="hover:bg-blue-50/30 transition-colors group">
-                                                <td className="p-2 text-xs text-slate-500 whitespace-nowrap">
-                                                    <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                                    <div className="opacity-60 text-[10px]">{new Date(log.timestamp).toLocaleDateString()}</div>
-                                                </td>
-                                                <td className="p-2 text-xs font-bold text-slate-800">
-                                                    {log.type === VerificationType.CREDIT_PURCHASE ? 
-                                                        <span className="text-emerald-600 flex items-center gap-1"><Wallet className="w-3 h-3"/> Purchase</span> : 
-                                                        log.type.replace(/_/g, ' ')
-                                                    }
-                                                </td>
-                                                <td className="p-2 text-xs text-slate-600 font-mono max-w-[150px] truncate" title={log.input}>
-                                                    {log.input}
-                                                </td>
-                                                <td className="p-2 text-xs text-slate-400 font-mono max-w-[100px] truncate" title={log.transactionRef}>
-                                                    {log.transactionRef || '-'}
-                                                </td>
-                                                <td className="p-2">
-                                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                        log.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                                                    }`}>
-                                                        {log.status}
-                                                    </span>
-                                                </td>
-                                                <td className="p-2 text-right">
-                                                    <button 
-                                                        onClick={() => setSelectedLog(log)}
-                                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-1 rounded"
-                                                    >
-                                                        Details
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <Pagination 
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                onPageChange={setCurrentPage}
-                            />
-                        </>
-                    )}
-                </div>
-             </Card>
-
-             <Modal 
-                isOpen={!!selectedLog} 
-                onClose={() => setSelectedLog(null)} 
-                title="Transaction Details"
-             >
-                {selectedLog && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Transaction ID</div>
-                                <div className="font-mono text-slate-800 break-all text-xs">{selectedLog.id}</div>
-                            </div>
-                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="text-xs text-slate-500 uppercase mb-1 font-bold">Reference (Paystack)</div>
-                                <div className="font-mono text-slate-800 break-all text-xs">{selectedLog.transactionRef || 'N/A'}</div>
-                            </div>
-                        </div>
-                        
-                        <div>
-                             <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-bold text-slate-900">Request Parameters</h4>
-                                <CopyButton text={JSON.stringify(selectedLog.details?.request || { input: selectedLog.input }, null, 2)} />
-                             </div>
-                             <div className="bg-slate-900 text-slate-300 p-4 rounded-lg font-mono text-xs overflow-x-auto shadow-inner">
-                                <pre>{JSON.stringify(selectedLog.details?.request || { input: selectedLog.input }, null, 2)}</pre>
-                             </div>
-                        </div>
-
-                        <div>
-                             <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-bold text-slate-900">Response / Result</h4>
-                                <CopyButton text={JSON.stringify(selectedLog.details?.response || { message: selectedLog.message }, null, 2)} />
-                             </div>
-                             <div className="bg-slate-900 text-emerald-400 p-4 rounded-lg font-mono text-xs overflow-x-auto shadow-inner">
-                                <pre>{JSON.stringify(selectedLog.details?.response || { message: selectedLog.message }, null, 2)}</pre>
-                             </div>
-                        </div>
-                    </div>
-                )}
-             </Modal>
-        </div>
-    );
-}
 
 const Dashboard = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
     const tools = [
-        { id: 'bvn', title: "BVN Resolution", desc: "Full KYC via BVN", icon: <Users className="w-6 h-6 text-blue-500"/> },
-        { id: 'nin', title: "NIN Lookup", desc: "NIMC database check", icon: <ShieldCheck className="w-6 h-6 text-indigo-500"/> },
-        { id: 'phone', title: "Phone Intel", desc: "Truecaller-style ID", icon: <Smartphone className="w-6 h-6 text-purple-500"/> },
-        { id: 'account', title: "Account Resolve", desc: "Get account names", icon: <CreditCard className="w-6 h-6 text-emerald-500"/> },
+        { id: 'bvn', title: "BVN Resolution", desc: "Full KYC via BVN", icon: <Users className="w-6 h-6 text-blue-500"/>, active: true },
+        { id: 'nin', title: "NIN Lookup", desc: "NIMC database check", icon: <ShieldCheck className="w-6 h-6 text-indigo-500"/>, active: true },
+        { id: 'phone', title: "Phone Intel", desc: "Truecaller-style ID", icon: <Smartphone className="w-6 h-6 text-slate-400"/>, active: false },
+        { id: 'account', title: "Account Resolve", desc: "Get account names", icon: <CreditCard className="w-6 h-6 text-slate-400"/>, active: false },
     ];
 
     return (
@@ -982,7 +314,7 @@ const Dashboard = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
              <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 p-8 opacity-10"><ShieldCheck size={120} /></div>
                 <h2 className="text-2xl font-bold mb-2 relative z-10">Welcome to NovaID</h2>
-                <p className="text-slate-400 max-w-lg relative z-10">The advanced identity verification layer for Nigeria. Fast, secure, and reliable data resolution powered by next-gen AI simulation.</p>
+                <p className="text-slate-400 max-w-lg relative z-10">The advanced identity verification layer for Nigeria. Powered by robust APIs and secure wallet infrastructure.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -992,20 +324,22 @@ const Dashboard = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 + (i * 0.1) }}
-                        onClick={() => onNavigate(tool.id)}
-                        className="group bg-white p-6 rounded-2xl border border-slate-200 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all cursor-pointer relative overflow-hidden"
+                        onClick={() => tool.active && onNavigate(tool.id)}
+                        className={`group bg-white p-6 rounded-2xl border border-slate-200 shadow-lg shadow-blue-900/5 transition-all relative overflow-hidden ${tool.active ? 'hover:shadow-xl hover:shadow-blue-500/10 cursor-pointer' : 'opacity-60 grayscale'}`}
                     >
-                         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 opacity-50" />
-                         
+                         {tool.active && <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 opacity-50" />}
+                         {!tool.active && <div className="absolute top-4 right-4 bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Coming Soon</div>}
                          <div className="relative z-10">
-                            <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                            <div className={`w-12 h-12 rounded-xl border border-slate-100 flex items-center justify-center mb-4 shadow-sm ${tool.active ? 'bg-white group-hover:scale-110 transition-transform duration-300' : 'bg-slate-50'}`}>
                                 {tool.icon}
                             </div>
                             <h3 className="text-lg font-bold text-slate-900 mb-1">{tool.title}</h3>
                             <p className="text-slate-500 text-sm mb-4">{tool.desc}</p>
-                            <div className="flex items-center text-blue-600 text-sm font-semibold group-hover:translate-x-1 transition-transform">
-                                Launch Tool <ChevronRight className="w-4 h-4 ml-1" />
-                            </div>
+                            {tool.active && (
+                                <div className="flex items-center text-blue-600 text-sm font-semibold group-hover:translate-x-1 transition-transform">
+                                    Launch Tool <ChevronRight className="w-4 h-4 ml-1" />
+                                </div>
+                            )}
                          </div>
                     </motion.div>
                 ))}
@@ -1019,69 +353,89 @@ const Dashboard = ({ onNavigate }: { onNavigate: (id: string) => void }) => {
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activePin, setActivePin] = useState<string | null>(null);
+  const [auth, setAuth] = useState<AuthData | null>(null);
   const [balance, setBalance] = useState(0);
+  const [accountInfo, setAccountInfo] = useState<{acc: string, bank: string} | null>(null);
+
+  // Real DB Fetch logic
+  const fetchUserData = async () => {
+      if(!auth) return;
+      try {
+          const res = await fetch('/api/user', {
+              headers: {
+                  'Authorization': `Bearer ${auth.token}`
+              }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              setBalance(data.balance);
+              setAccountInfo({ acc: data.virtual_account_number, bank: data.virtual_account_bank });
+          }
+      } catch (e) {
+          console.error("Failed to fetch user data", e);
+      }
+  };
 
   useEffect(() => {
-      // Check if user is already logged in via simpler session mechanism if needed, 
-      // but for now, prompt login on refresh to ensure security simulation.
-      // For "swift" feel, we could persist activePin in sessionStorage.
-      const savedPin = sessionStorage.getItem('novaid_active_pin');
-      if (savedPin && validatePin(savedPin)) {
-          setActivePin(savedPin);
-          setBalance(getBalance(savedPin));
+      const storedAuth = sessionStorage.getItem('novaid_auth');
+      if (storedAuth) {
+          setAuth(JSON.parse(storedAuth));
       }
   }, []);
 
-  const handleLogin = (pin: string) => {
-      setActivePin(pin);
-      setBalance(getBalance(pin));
-      sessionStorage.setItem('novaid_active_pin', pin);
+  useEffect(() => {
+      if (auth) {
+          fetchUserData();
+          // Poll balance every 15s in case of webhook funding
+          const interval = setInterval(fetchUserData, 15000);
+          return () => clearInterval(interval);
+      }
+  }, [auth]);
+
+  const handleLogin = (data: AuthData) => {
+      setAuth(data);
+      sessionStorage.setItem('novaid_auth', JSON.stringify(data));
   };
 
   const handleLogout = () => {
-      setActivePin(null);
+      setAuth(null);
       setBalance(0);
-      sessionStorage.removeItem('novaid_active_pin');
+      setAccountInfo(null);
+      sessionStorage.removeItem('novaid_auth');
       setActiveTab('dashboard');
   };
 
-  const refreshBalance = () => {
-      if (activePin) setBalance(getBalance(activePin));
-  };
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'bvn', label: 'BVN Resolution', icon: <Users size={20} />, type: VerificationType.BVN },
     { id: 'nin', label: 'NIN Lookup', icon: <ShieldCheck size={20} />, type: VerificationType.NIN },
-    { id: 'bvn_match', label: 'BVN Match', icon: <Search size={20} />, type: VerificationType.BVN_MATCH },
     { id: 'phone', label: 'Phone ID', icon: <Smartphone size={20} />, type: VerificationType.PHONE },
     { id: 'account', label: 'Account Verify', icon: <CreditCard size={20} />, type: VerificationType.ACCOUNT },
-    { id: 'audit', label: 'Audit Logs', icon: <FileText size={20} /> },
+    { id: 'admin', label: 'Admin Logs', icon: <Lock size={20} /> },
   ];
 
-  if (!activePin) {
-      return <CreditPortal onLogin={handleLogin} />;
+  if (!auth) {
+      return <AuthPortal onLogin={handleLogin} />;
   }
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard onNavigate={setActiveTab} />;
-      case 'bvn': return <BVNVerification activePin={activePin} refreshBalance={refreshBalance} />;
-      case 'nin': return <NINVerification activePin={activePin} refreshBalance={refreshBalance} />;
-      case 'bvn_match': return <BvnMatch activePin={activePin} refreshBalance={refreshBalance} />;
-      case 'phone': return <PhoneVerification activePin={activePin} refreshBalance={refreshBalance} />;
-      case 'account': return <AccountVerification activePin={activePin} refreshBalance={refreshBalance} />;
-      case 'audit': return <AuditLogs />;
+      case 'bvn': return <BVNVerification auth={auth} onVerified={fetchUserData} />;
+      case 'nin': return <NINVerification auth={auth} onVerified={fetchUserData} />;
+      case 'phone': return <DisabledFeature title="Phone Intelligence" desc="Caller ID features are currently disabled." />;
+      case 'account': return <DisabledFeature title="Account Resolution" desc="Bank account verification is coming soon." />;
+      case 'admin': return <AdminView token={auth.token} />;
       default: return <Dashboard onNavigate={setActiveTab} />;
     }
   };
 
   return (
-    <div className="min-h-screen flex text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 relative z-10">
+    <div className="min-h-screen flex text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 relative z-10 bg-slate-50">
       
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col w-72 bg-white/95 backdrop-blur-md border-r border-slate-200 fixed h-full z-20 shadow-sm">
+      <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 fixed h-full z-20 shadow-sm">
         <div className="p-8">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold font-display text-xl shadow-lg shadow-slate-900/20">
@@ -1104,6 +458,7 @@ const App = () => {
             >
               {item.icon}
               {item.label}
+              {['phone', 'account'].includes(item.id) && <span className="ml-auto text-[9px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500 uppercase font-bold">SOON</span>}
             </button>
           ))}
         </nav>
@@ -1111,13 +466,26 @@ const App = () => {
         <div className="p-4 border-t border-slate-100">
             <div className="bg-slate-900 rounded-xl p-4 text-white shadow-lg shadow-slate-900/10">
                  <div className="flex justify-between items-center mb-2">
-                     <div className="text-xs text-slate-400 font-medium">Balance</div>
-                     <div className="flex items-center gap-1 text-xs text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Active</div>
+                     <div className="text-xs text-slate-400 font-medium">Wallet Balance</div>
+                     <div className="flex items-center gap-1 text-xs text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Live</div>
                  </div>
-                 <div className="font-display font-bold text-2xl">{balance} Credits</div>
-                 <div className="text-xs text-slate-500 mt-1 font-mono tracking-widest">PIN: ****</div>
-                 <button onClick={handleLogout} className="mt-3 w-full py-2 bg-slate-800 rounded-lg text-xs font-medium hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
-                    <LogOut className="w-3 h-3" /> Lock Session
+                 <div className="font-display font-bold text-2xl">₦{balance.toLocaleString()}</div>
+
+                 {accountInfo?.acc && (
+                     <div className="mt-4 pt-3 border-t border-slate-700/50">
+                         <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-bold">Fund Wallet via Transfer</div>
+                         <div className="flex justify-between items-center bg-slate-800 p-2 rounded-lg">
+                             <div>
+                                 <div className="font-mono text-sm font-bold tracking-widest">{accountInfo.acc}</div>
+                                 <div className="text-[10px] text-slate-400">{accountInfo.bank}</div>
+                             </div>
+                             <CopyButton text={accountInfo.acc} />
+                         </div>
+                     </div>
+                 )}
+
+                 <button onClick={handleLogout} className="mt-4 w-full py-2 bg-slate-800/50 rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-rose-400">
+                    <LogOut className="w-3 h-3" /> Secure Logout
                  </button>
             </div>
         </div>
@@ -1143,9 +511,10 @@ const App = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="fixed inset-0 top-[73px] bg-white z-20 p-4 lg:hidden flex flex-col"
             >
-                <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="text-sm text-slate-500 mb-1 font-medium">Available Credits</div>
-                    <div className="text-2xl font-bold text-slate-900">{balance}</div>
+                <div className="mb-6 p-4 bg-slate-900 text-white rounded-xl shadow-lg">
+                    <div className="text-sm text-slate-400 mb-1 font-medium">Wallet Balance</div>
+                    <div className="text-2xl font-bold">₦{balance.toLocaleString()}</div>
+                    {accountInfo?.acc && <div className="mt-2 text-xs text-slate-300">Fund Account: {accountInfo.acc} ({accountInfo.bank})</div>}
                 </div>
                 <nav className="space-y-2 flex-1">
                 {navItems.map((item) => (
@@ -1185,10 +554,10 @@ const App = () => {
             <div className="hidden md:flex items-center gap-4">
                 <div className="text-right">
                     <div className="text-sm font-bold text-slate-900">Enterprise API</div>
-                    <div className="text-xs text-slate-500 font-medium">v2.5.1 • Secure</div>
+                    <div className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1"><Lock size={10}/> Secure Connection</div>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-200 shadow-sm overflow-hidden p-1">
-                   <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                   <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center text-white">
                         <ShieldCheck size={20} />
                    </div>
                 </div>
